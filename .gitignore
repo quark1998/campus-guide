@@ -1,0 +1,40 @@
+﻿# IDE
+.idea/
+*.iml
+
+# Build outputs
+**/target/
+**/build/
+**/*.class
+**/*.jar
+**/*.war
+
+# Gradle
+.gradle/
+**/gradle/wrapper/gradle-wrapper.jar
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+
+# OS
+.DS_Store
+Thumbs.db
+
+# DB
+*.db
+*.db-shm
+*.db-wal
+
+# Zips
+*.zip
+*.gz
+
+# Local config
+local.properties
+
+# Upload test data
+**/uploads/*.jpg
+**/uploads/*.png
+
+# Keep uploads dir
+!**/uploads/.gitkeep

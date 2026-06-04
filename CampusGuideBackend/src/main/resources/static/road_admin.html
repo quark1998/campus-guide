@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>高德真实路网可视化编辑器</title>
+
+    <script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script type="text/javascript">window._AMapSecurityConfig = { securityJsCode: '1e2ddd7f4287d364e68473e740e68d80' }</script>
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=5516ea7034e9c5687e905faaf47f1150"></script>
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;}
+        #app { display: flex; height: 100vh; }
+        .control-panel { width: 350px; padding: 20px; background: #fff; box-shadow: 2px 0 6px rgba(0,0,0,0.1); z-index: 1000; display: flex; flex-direction: column; }
+        #map { flex: 1; height: 100%; }
+        .panel-title { font-size: 20px; font-weight: bold; margin-bottom: 20px; color: #409EFF;}
+        .instruction { font-size: 14px; color: #606266; margin-top: 15px; background: #f4f4f5; padding: 10px; border-radius: 4px; border-left: 4px solid #E6A23C;}
+    </style>
+</head>
+<body>
+<div id="app">
+    <div class="control-panel">
+        <div class="panel-title"><i class="el-icon-map-location"></i> 真实路网编辑器</div>
+        <el-radio-group v-model="mode" size="medium" style="margin-bottom: 20px;">
+            <el-radio-button label="addNode">设点</el-radio-button>
+            <el-radio-button label="addEdge">连线</el-radio-button>
+            <el-radio-button label="delete">删除</el-radio-button>
+        </el-radio-group>
+        <div v-if="mode === 'addNode'" class="instruction"><b>操作说明：</b><br>在真实地图上精准点击路口位置。</div>
+        <div v-if="mode === 'addEdge'" class="instruction"><b>操作说明：</b><br>点击两个已有的标记点连线。<br><br><span v-if="selectedNode">起点：{{ selectedNode.name }}</span></div>
+        <div v-if="mode === 'delete'" class="instruction"><b>操作说明：</b><br>点击节点可将其与相关道路一并销毁。</div>
+        <el-button type="success" icon="el-icon-refresh" style="margin-top: 20px;" @click="loadData">刷新路网数据</el-button>
+    </div>
+    <div id="map"></div>
+</div>
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                map: null, mode: 'addNode',
+                nodes: [], edges: [],
+                mapMarkers: {}, mapPolylines: [],
+                selectedNode: null
+            }
+        },
+        mounted() { this.initMap(); },
+        methods: {
+            initMap() {
+                this.map = new AMap.Map('map', { zoom: 16, center: [119.923, 31.765] });
+                this.map.on('click', (e) => {
+                    if (this.mode !== 'addNode') return;
+                    this.$prompt('请输入路口名称', '新增真实节点').then(({ value }) => {
+                        axios.post('/api/admin/map/node', { name: value || '未命名', lat: e.lnglat.lat, lng: e.lnglat.lng }).then(res => {
+                            this.$message.success('添加成功！'); this.loadData();
+                        });
+                    }).catch(() => {});
+                });
+                setTimeout(() => { this.loadData(); }, 500);
+            },
+
+            loadData() {
+                Object.values(this.mapMarkers).forEach(m => this.map.remove(m));
+                this.map.remove(this.mapPolylines);
+                this.mapMarkers = {}; this.mapPolylines = [];
+                let infoWindow = new AMap.InfoWindow({
+                    isCustom: true,
+                    offset: new AMap.Pixel(0, -10)
+                });
+
+                axios.get('/api/admin/map/nodes').then(res => {
+                    this.nodes = res.data.data;
+                    this.nodes.forEach(node => {
+                        let marker = new AMap.CircleMarker({
+                            center: [node.lng, node.lat],
+                            radius: 5,
+                            fillColor: '#409EFF',
+                            strokeColor: '#FFFFFF',
+                            strokeWeight: 2,
+                            cursor: 'pointer'
+                        });
+                        marker.on('mouseover', () => {
+                            let content = `<div style="padding: 5px 10px; background: rgba(0,0,0,0.8); color: #fff; border-radius: 4px; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); pointer-events: none; white-space: nowrap;">${node.name}</div>`;
+                            infoWindow.setContent(content);
+                            infoWindow.open(this.map, [node.lng, node.lat]);
+                        });
+                        marker.on('mouseout', () => {
+                            infoWindow.close();
+                        });
+                        marker.on('click', () => { this.handleNodeClick(node); });
+                        this.map.add(marker);
+                        this.mapMarkers[node.id] = marker;
+                    });
+                });
+                axios.get('/api/admin/map/edges').then(res => {
+                    this.edges = res.data.data;
+                    this.edges.forEach(edge => {
+                        let polyline = new AMap.Polyline({
+                            path: [[edge.lng1, edge.lat1], [edge.lng2, edge.lat2]],
+                            strokeColor: '#67C23A',
+                            strokeWeight: 4,
+                            strokeOpacity: 0.8,
+                            showDir: true
+                        });
+                        this.map.add(polyline);
+                        this.mapPolylines.push(polyline);
+                    });
+                });
+            },
+            handleNodeClick(node) {
+                if (this.mode === 'delete') {
+                    this.$confirm(`删除路口【${node.name}】及相连的道路?`).then(() => {
+                        axios.delete('/api/admin/map/node/' + node.id).then(() => {
+                            this.$message.success('已删除'); this.selectedNode = null; this.loadData();
+                        });
+                    }).catch(()=>{}); return;
+                }
+                if (this.mode !== 'addEdge') return;
+
+                if (!this.selectedNode) {
+                    this.selectedNode = node;
+                    this.mapMarkers[node.id].setOptions({
+                        fillColor: '#F56C6C',
+                        radius: 7
+                    });
+                    this.$message.info(`已选中起点：${node.name}`);
+                } else {
+                    if (this.selectedNode.id === node.id) return;
+                    let p1 = new AMap.LngLat(this.selectedNode.lng, this.selectedNode.lat);
+                    let p2 = new AMap.LngLat(node.lng, node.lat);
+                    let distance = Math.round(AMap.GeometryUtil.distance(p1, p2));
+
+                    this.$confirm(`将【${this.selectedNode.name}】与【${node.name}】连线?<br>物理距离: <b>${distance}米</b>`, '建立道路', {dangerouslyUseHTMLString: true}).then(() => {
+                        axios.post('/api/admin/map/edge', { sourceId: this.selectedNode.id, targetId: node.id, distance }).then(() => {
+                            this.$message.success('道路连接成功');
+                            this.selectedNode = null;
+                            this.loadData();
+                        });
+                    }).catch(() => {
+                        this.mapMarkers[this.selectedNode.id].setOptions({
+                            fillColor: '#409EFF',
+                            radius: 5
+                        });
+                        this.selectedNode = null;
+                    });
+                }
+            }
+        }
+    })
+</script>
+</body>
+</html>

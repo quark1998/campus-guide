@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="glass_card">#EEFFFFFF</color>
+    <color name="glass_stroke">#66FFFFFF</color>
+
+    <color name="campus_blue">#3A86FF</color>
+    <color name="campus_cyan">#30D5C8</color>
+    <color name="campus_green">#69DB7C</color>
+    <color name="campus_yellow">#FFE066</color>
+    <color name="campus_orange">#FFB86C</color>
+    <color name="campus_red">#FF6B6B</color>
+    <color name="page_bg">#F6FAFF</color>
+    <color name="card_white">#FFFFFFFF</color>
+    <color name="card_soft">#F2FFFFFF</color>
+    <color name="glass_card">#F2FFFFFF</color>
+    <color name="glass_stroke">#80FFFFFF</color>
+    <color name="text_primary">#172033</color>
+    <color name="text_secondary">#6B7280</color>
+    <color name="text_light">#9CA3AF</color>
+    <color name="input_fill">#F7FAFF</color>
+    <color name="input_stroke">#DDEBFF</color>
+    <color name="divider_soft">#EEF3FA</color>
+    <color name="line_soft">#EAF0F8</color>
+    <color name="danger_red">#FF5A66</color>
+    <color name="route_blue">#3A86FF</color>
+    <color name="blue_soft">#1A3A86FF</color>
+    <color name="green_soft">#1A69DB7C</color>
+    <color name="orange_soft">#1AFFB86C</color>
+    <color name="red_soft">#1AFF6B6B</color>
+</resources>

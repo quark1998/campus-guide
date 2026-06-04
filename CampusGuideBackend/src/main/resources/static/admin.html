@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>校园智能导览 - 管理员后台</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <style>
+        body { margin: 0; background-color: #f0f2f5; font-family: "Helvetica Neue",Helvetica,Arial,sans-serif; }
+        .header { background-color: #409EFF; color: white; line-height: 60px; font-size: 20px; font-weight: bold; padding-left: 20px; display: flex; justify-content: space-between; align-items: center; padding-right: 20px;}
+        .main-container { padding: 20px; }
+        .box-card { margin-bottom: 20px; border-radius: 8px;}
+        #amap-container { width: 100%; height: 600px; border-radius: 8px; border: 1px solid #EBEEF5;}
+        .search-bar { margin-bottom: 15px; display: flex; gap: 10px; }
+    </style>
+    <script type="text/javascript">window._AMapSecurityConfig = { securityJsCode: '1e2ddd7f4287d364e68473e740e68d80' }</script>
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=5516ea7034e9c5687e905faaf47f1150"></script>
+</head>
+<body>
+<div id="app">
+    <div class="header">
+        <span>校园管理系统 - 数据控制台</span>
+        <el-button type="danger" size="small" @click="doLogout" round>安全退出</el-button>
+    </div>
+
+    <div class="main-container">
+        <el-row :gutter="20">
+            <el-col :span="4">
+                <el-menu :default-active="activeIndex" @select="handleSelect" style="min-height: 80vh; border-radius: 8px;">
+                    <el-menu-item index="1"><i class="el-icon-user"></i>用户管理</el-menu-item>
+                    <el-menu-item index="2"><i class="el-icon-odometer"></i>轨迹记录</el-menu-item>
+                    <el-menu-item index="3"><i class="el-icon-map-location"></i>地图打点</el-menu-item>
+                    <el-menu-item index="4"><i class="el-icon-collection"></i>地标数据</el-menu-item>
+                    <el-menu-item index="5"><i class="el-icon-bell"></i>通知发布</el-menu-item>
+                    <el-menu-item index="6"><i class="el-icon-box"></i>失物招领</el-menu-item>
+                    <el-menu-item index="7"><i class="el-icon-setting"></i>布局管理</el-menu-item>
+                    <el-menu-item index="8"><i class="el-icon-share"></i> 拓扑路网规划(核心)</el-menu-item>
+                </el-menu>
+            </el-col>
+
+            <el-col :span="20">
+                <el-card class="box-card" v-show="activeIndex === '1'">
+                    <div class="search-bar">
+                        <el-input v-model="searchUser" placeholder="搜索学号或昵称..." prefix-icon="el-icon-search" clearable style="width: 300px;"></el-input>
+                    </div>
+                    <el-table :data="filteredUsers" border stripe>
+
+                        <el-table-column label="头像" width="80" align="center">
+                            <template slot-scope="scope">
+                                <el-avatar :size="40" :src="scope.row.avatar" icon="el-icon-user"></el-avatar>
+                            </template>
+                        </el-table-column>
+
+                        <el-table-column prop="student_id" label="学号" sortable></el-table-column>
+                        <el-table-column prop="nickname" label="昵称"></el-table-column>
+
+                        <el-table-column prop="password" label="密码"></el-table-column>
+
+                        <el-table-column label="操作" width="100">
+                            <template slot-scope="s">
+                                <el-button type="danger" size="mini" @click="handleDeleteUser(s.row)">删除</el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                </el-card>
+
+                <el-card class="box-card" v-show="activeIndex === '2'">
+                    <div class="search-bar">
+                        <el-input v-model="searchTrack" placeholder="输入学号检索轨迹..." prefix-icon="el-icon-search" clearable style="width: 300px;"></el-input>
+                    </div>
+                    <el-table :data="filteredTracks" border stripe>
+                        <el-table-column prop="studentId" label="学号" sortable></el-table-column>
+                        <el-table-column prop="distance" label="距离 (米)" sortable></el-table-column>
+                        <el-table-column prop="createTime" label="上传时间" sortable></el-table-column>
+                    </el-table>
+                </el-card>
+
+                <el-card class="box-card" v-show="activeIndex === '3'">
+                    <el-row :gutter="20">
+                        <el-col :span="18"><div id="amap-container"></div></el-col>
+                        <el-col :span="6">
+                            <el-form :model="markerForm" label-position="top">
+                                <el-form-item label="坐标信息"><el-input v-model="markerForm.coords" disabled></el-input></el-form-item>
+                                <el-form-item label="地标名称"><el-input v-model="markerForm.name"></el-input></el-form-item>
+                                <el-form-item label="所属分类"><el-input v-model="markerForm.category" placeholder="如: 教学楼、食堂"></el-input></el-form-item>
+                                <el-form-item label="详细介绍"><el-input type="textarea" v-model="markerForm.snippet"></el-input></el-form-item>
+                                <el-button type="primary" style="width:100%; margin-bottom: 10px;" @click="submitMarker">保存到地图</el-button>
+                                <el-button v-if="markerForm.id" type="danger" style="width:100%; margin-left: 0; margin-bottom: 10px;" @click="deleteMarkerFromPanel">删除此打卡点</el-button>
+                                <el-button v-if="markerForm.id" type="info" style="width:100%; margin-left: 0;" @click="resetMarkerForm">取消选中</el-button>
+                            </el-form>
+                        </el-col>
+                    </el-row>
+                </el-card>
+
+                <el-card class="box-card" v-show="activeIndex === '4'">
+                    <div slot="header" style="display:flex; justify-content: space-between; align-items:center">
+                        <span>校园地标</span>
+                        <el-button type="primary" size="mini" @click="fetchMarkers">刷新列表</el-button>
+                    </div>
+                    <div class="search-bar">
+                        <el-input v-model="searchMarker" placeholder="搜索地标名称或分类..." prefix-icon="el-icon-search" clearable style="width: 300px;"></el-input>
+                    </div>
+                    <el-table :data="filteredMarkers" border stripe>
+                        <el-table-column prop="category" label="分类" width="120" sortable></el-table-column>
+                        <el-table-column prop="name" label="地标名称" width="180" sortable></el-table-column>
+                        <el-table-column prop="snippet" label="介绍"></el-table-column>
+                        <el-table-column label="操作" width="80" align="center">
+                            <template slot-scope="scope">
+                                <el-button type="danger" size="mini" icon="el-icon-delete" circle @click="deleteMarker(scope.row)"></el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                </el-card>
+
+                <el-card class="box-card" v-show="activeIndex === '5'">
+                    <div slot="header"><span>发布新通知</span></div>
+                    <el-form :model="noticeForm" label-width="80px">
+                        <el-form-item label="标题"><el-input v-model="noticeForm.title"></el-input></el-form-item>
+                        <el-form-item label="正文"><el-input type="textarea" :rows="3" v-model="noticeForm.content"></el-input></el-form-item>
+                        <el-button type="primary" @click="submitNotice">发布通知</el-button>
+                    </el-form>
+
+                    <el-divider content-position="left">历史通知管理</el-divider>
+                    <div class="search-bar">
+                        <el-input v-model="searchNotice" placeholder="搜索通知标题或正文..." prefix-icon="el-icon-search" clearable style="width: 300px;"></el-input>
+                    </div>
+                    <el-table :data="filteredNotices" border stripe>
+                        <el-table-column prop="id" label="ID" width="80" sortable></el-table-column>
+                        <el-table-column prop="title" label="标题" width="200"></el-table-column>
+                        <el-table-column prop="content" label="正文预览" show-overflow-tooltip></el-table-column>
+                        <el-table-column prop="create_time" label="发布时间" width="180" sortable></el-table-column>
+                        <el-table-column label="操作" width="150" align="center">
+                            <template slot-scope="s">
+                                <el-button type="warning" size="mini" @click="openEditNoticeDialog(s.row)">修改</el-button>
+                                <el-button type="danger" size="mini" @click="adminDeleteNotice(s.row)">撤回</el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                </el-card>
+
+                <el-dialog title="修改校园通知" :visible.sync="editNoticeVisible" width="50%">
+                    <el-form :model="editNoticeForm" label-width="80px">
+                        <el-form-item label="标题"><el-input v-model="editNoticeForm.title"></el-input></el-form-item>
+                        <el-form-item label="正文"><el-input type="textarea" :rows="5" v-model="editNoticeForm.content"></el-input></el-form-item>
+                    </el-form>
+                    <span slot="footer" class="dialog-footer">
+                        <el-button @click="editNoticeVisible = false">取消</el-button>
+                        <el-button type="primary" @click="saveEditNotice">确认修改</el-button>
+                    </span>
+                </el-dialog>
+
+                <el-card class="box-card" v-show="activeIndex === '6'">
+                    <div class="search-bar">
+                        <el-input v-model="searchLostFound" placeholder="搜索学号或标题..." prefix-icon="el-icon-search" clearable style="width: 300px;"></el-input>
+                    </div>
+                    <el-table :data="filteredLostFounds" border stripe>
+                        <el-table-column prop="id" label="ID" width="60"></el-table-column>
+                        <el-table-column prop="type" label="类型" width="80" align="center">
+                            <template slot-scope="s">
+                                <el-tag :type="s.row.type === '失物' ? 'danger' : 'success'">{{s.row.type || '未知'}}</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="title" label="标题" show-overflow-tooltip></el-table-column>
+                        <el-table-column prop="content" label="描述详情" show-overflow-tooltip></el-table-column>
+                        <el-table-column prop="contact" label="联系方式" width="120"></el-table-column>
+                        <el-table-column label="当前状态" width="100" align="center">
+                            <template slot-scope="s">
+                                <el-tag v-if="!s.row.status || s.row.status === 0" type="info">公示中</el-tag>
+                                <el-tag v-if="s.row.status === 1" type="success">已解决</el-tag>
+                                <el-tag v-if="s.row.status === 2" type="danger">违规下架</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="操作" width="260">
+                            <template slot-scope="s">
+                                <el-button type="success" size="mini" @click="changeLostFoundStatus(s.row.id, 1)" :disabled="s.row.status === 1">标记解决</el-button>
+                                <el-button type="warning" size="mini" @click="changeLostFoundStatus(s.row.id, 2)" :disabled="s.row.status === 2">违规封禁</el-button>
+                                <el-button type="danger" size="mini" @click="adminDeleteLostFound(s.row)">删除</el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                </el-card>
+
+                <el-card class="box-card" v-show="activeIndex === '7'">
+                    <div slot="header"><span>首页深度定制控制台</span></div>
+                    <el-form label-width="100px" size="small">
+                        <el-row :gutter="20">
+                            <el-col :span="12">
+                                <el-form-item label="学校全称"><el-input v-model="sysConfig.school_name"></el-input></el-form-item>
+                                <el-form-item label="核心校训"><el-input v-model="sysConfig.school_slogan"></el-input></el-form-item>
+                                <el-form-item label="荣誉标签"><el-input v-model="sysConfig.school_tags"></el-input></el-form-item>
+                                <el-form-item label="滚动公告"><el-input v-model="sysConfig.school_marquee"></el-input></el-form-item>
+                                <el-form-item label="校园简介"><el-input type="textarea" :rows="4" v-model="sysConfig.school_intro"></el-input></el-form-item>
+                            </el-col>
+                            <el-col :span="12">
+                                <el-form-item label="建校时间"><el-input v-model="sysDetails.found_year"></el-input></el-form-item>
+                                <el-form-item label="办校类型"><el-input v-model="sysDetails.type"></el-input></el-form-item>
+                                <el-form-item label="院校类型"><el-input v-model="sysDetails.category"></el-input></el-form-item>
+                                <el-form-item label="所在地"><el-input v-model="sysDetails.location"></el-input></el-form-item>
+                            </el-col>
+                        </el-row>
+
+                        <el-divider content-position="left">图片资源 (填写图片网址)</el-divider>
+                        <el-form-item label="学校校徽"><el-input v-model="sysConfig.school_logo"></el-input></el-form-item>
+                        <el-form-item label="轮播图 (JSON)">
+                            <el-input type="textarea" :rows="3" v-model="sysConfig.banner_images" placeholder='["http://图1.jpg", "http://图2.jpg", "http://图3.jpg"]'></el-input>
+                        </el-form-item>
+
+                        <el-button type="success" icon="el-icon-upload" style="width:100%; margin-top: 15px;" @click="saveSysLayout">一键同步至所有手机客户端</el-button>
+                    </el-form>
+                </el-card>
+                <el-card class="box-card" v-show="activeIndex === '8'" :body-style="{ padding: '0px' }">
+
+                    <iframe src="road_admin.html" width="100%" height="750px" frameborder="0" style="display: block; border-radius: 8px;"></iframe>
+                </el-card>
+            </el-col>
+        </el-row>
+    </div>
+</div>
+
+<script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                activeIndex: '5',
+                users: [], tracks: [], markersList: [], notices: [], lostFounds: [],
+                markerForm: { id: null, name: '', snippet: '', lat: '', lng: '', coords: '', category: '' },
+                mapMarkers: [],
+                map: null,
+                tempMarker: null,
+                searchUser: '', searchTrack: '', searchMarker: '', searchNotice: '', searchLostFound: '',
+                noticeForm: { title: '', content: '' },
+                editNoticeVisible: false,
+                editNoticeForm: { id: '', title: '', content: '' },
+                sysConfig: {
+                    school_name: '', school_slogan: '', school_tags: '',
+                    school_marquee: '', school_logo: '', banner_images: '', school_intro: ''
+                },
+                sysDetails: { found_year: '', type: '', category: '', location: '' },
+                weatherObj: { temp: '', desc: '', wind: '' }
+            }
+        },
+        computed: {
+            filteredUsers() {
+                return this.users.filter(u => !this.searchUser ||
+                    (u.student_id && u.student_id.includes(this.searchUser)) ||
+                    (u.nickname && u.nickname.includes(this.searchUser)));
+            },
+            filteredTracks() {
+                return this.tracks.filter(t => !this.searchTrack ||
+                    (t.studentId && t.studentId.includes(this.searchTrack)));
+            },
+            filteredMarkers() {
+                return this.markersList.filter(m => !this.searchMarker ||
+                    (m.name && m.name.includes(this.searchMarker)) ||
+                    (m.category && m.category.includes(this.searchMarker)));
+            },
+            filteredNotices() {
+                return this.notices.filter(n => !this.searchNotice ||
+                    (n.title && n.title.includes(this.searchNotice)) ||
+                    (n.content && n.content.includes(this.searchNotice)));
+            },
+            filteredLostFounds() {
+                return this.lostFounds.filter(l => !this.searchLostFound ||
+                    (l.student_id && l.student_id.includes(this.searchLostFound)) ||
+                    (l.title && l.title.includes(this.searchLostFound)));
+            }
+        },
+        mounted() {
+            if(!localStorage.getItem('adminToken')) { window.location.href = '/admin-login.html'; return; }
+            this.fetchUsers();
+            this.fetchMarkers();
+            this.fetchTracks();
+            this.fetchLostFounds();
+            this.fetchNotices();
+            this.fetchSysConfig();
+            setTimeout(() => { this.initMap(); }, 500);
+        },
+        methods: {
+            handleSelect(key) { this.activeIndex = key; },
+            initMap() {
+                this.map = new AMap.Map('amap-container', { zoom: 16 });
+                AMap.plugin('AMap.Geolocation', () => {
+                    const geolocation = new AMap.Geolocation({
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        buttonPosition: 'RB',
+                        zoomToAccuracy: true,
+                        showMarker: false,
+                        showCircle: false
+                    });
+                    this.map.addControl(geolocation);
+                    geolocation.getCurrentPosition();
+                });
+                this.map.on('click', (e) => {
+                    this.resetMarkerForm();
+                    this.markerForm.lat = e.lnglat.lat;
+                    this.markerForm.lng = e.lnglat.lng;
+                    this.markerForm.coords = `${e.lnglat.lng.toFixed(5)}, ${e.lnglat.lat.toFixed(5)}`;
+                    if (this.tempMarker) this.map.remove(this.tempMarker);
+                    this.tempMarker = new AMap.CircleMarker({
+                        center: [e.lnglat.lng, e.lnglat.lat],
+                        radius: 12,
+                        fillColor: '#409EFF',
+                        fillOpacity: 0.8,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2
+                    });
+                    this.map.add(this.tempMarker);
+                });
+                this.renderMapMarkers();
+            },
+            fetchUsers() { axios.get('/api/admin/users').then(r => this.users = r.data.data); },
+            fetchTracks() { axios.get('/api/admin/tracks').then(r => this.tracks = r.data.data); },
+            fetchMarkers() {
+                axios.get('/api/markers').then(r => {
+                    this.markersList = r.data.data;
+                    if (this.map) {
+                        this.renderMapMarkers();
+                    }
+                });
+            },
+            renderMapMarkers() {
+                if (this.mapMarkers.length > 0) {
+                    this.map.remove(this.mapMarkers);
+                    this.mapMarkers = [];
+                }
+                this.markersList.forEach(m => {
+                    const circleMarker = new AMap.CircleMarker({
+                        center: [m.longitude, m.latitude],
+                        radius: 8,
+                        fillColor: '#67C23A', // 绿色
+                        fillOpacity: 0.9,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2,
+                        cursor: 'pointer',
+                        extData: m
+                    });
+                    circleMarker.on('click', (e) => {
+                        const data = e.target.getExtData();
+                        this.markerForm = {
+                            id: data.id,
+                            name: data.name,
+                            category: data.category,
+                            snippet: data.snippet,
+                            lat: data.latitude,
+                            lng: data.longitude,
+                            coords: `${data.longitude}, ${data.latitude}`
+                        };
+                        if (this.tempMarker) this.map.remove(this.tempMarker);
+                    });
+                    this.mapMarkers.push(circleMarker);
+                });
+                this.map.add(this.mapMarkers);
+            },
+            fetchLostFounds() { axios.get('/api/lostfound').then(r => this.lostFounds = r.data.data); },
+            fetchNotices() { axios.get('/api/notices').then(r => this.notices = r.data.data); },
+            submitMarker() {
+                if(!this.markerForm.name) return this.$message.warning("请填写地标名称");
+                if (this.markerForm.id) {
+                    axios.put(`/api/admin/markers/${this.markerForm.id}`, this.markerForm).then(r => {
+                        this.$message.success("修改成功");
+                        this.fetchMarkers();
+                    });
+                } else {
+                    axios.post('/api/admin/markers', this.markerForm).then(r => {
+                        this.$message.success("保存成功");
+                        this.fetchMarkers();
+                    });
+                }
+            },
+
+            resetMarkerForm() {
+                this.markerForm = { id: null, name: '', snippet: '', lat: '', lng: '', coords: '', category: '' };
+            },
+            deleteMarkerFromPanel() {
+                if (!this.markerForm.id) return;
+                this.$confirm(`确定删除地标 ${this.markerForm.name}?`).then(() => {
+                    axios.delete(`/api/admin/markers/${this.markerForm.id}`).then(() => {
+                        this.$message.success("点位已删除");
+                        this.resetMarkerForm();
+                        this.fetchMarkers();
+                    });
+                }).catch(() => {});
+            },
+
+            deleteMarker(row) {
+                this.$confirm(`确定删除地标 ${row.name}?`).then(() => {
+                    axios.delete(`/api/admin/markers/${row.id}`).then(() => {
+                        this.$message.success("已删除"); this.fetchMarkers();
+                    });
+                }).catch(() => {});
+            },
+            handleDeleteUser(row) {
+                this.$confirm(`确定删除用户 ${row.nickname}?`).then(() => {
+                    axios.delete(`/api/admin/users/${row.id}`).then(() => {
+                        this.$message.success("用户已删除"); this.fetchUsers();
+                    });
+                }).catch(() => {});
+            },
+
+            submitNotice() {
+                if(!this.noticeForm.title) return this.$message.warning("请输入标题");
+                axios.post('/api/admin/notices', this.noticeForm).then(r => {
+                    this.$message.success("发布成功");
+                    this.noticeForm = { title: '', content: '' };
+                    this.fetchNotices();
+                });
+            },
+            openEditNoticeDialog(row) {
+                this.editNoticeForm = { id: row.id, title: row.title, content: row.content };
+                this.editNoticeVisible = true;
+            },
+            saveEditNotice() {
+                axios.put(`/api/admin/notices/${this.editNoticeForm.id}`, this.editNoticeForm).then(r => {
+                    this.$message.success("修改成功");
+                    this.editNoticeVisible = false;
+                    this.fetchNotices();
+                }).catch(() => this.$message.error("修改失败，请确保后端支持该接口"));
+            },
+            adminDeleteNotice(row) {
+                this.$confirm('确定要撤回该通知吗?').then(() => {
+                    axios.delete(`/api/admin/notices/${row.id}`).then(() => {
+                        this.$message.success("已撤回"); this.fetchNotices();
+                    });
+                }).catch(() => {});
+            },
+
+            adminDeleteLostFound(row) {
+                axios.delete(`/api/lostfound/${row.id}?studentId=admin`).then(() => {
+                    this.$message.success("已删除"); this.fetchLostFounds();
+                });
+            },
+            changeLostFoundStatus(id, newStatus) {
+                axios.put(`/api/admin/lostfound/status/${id}?status=${newStatus}`).then(() => {
+                    this.$message.success("状态已更新");
+                    this.fetchLostFounds(); // 刷新表格
+                });
+            },
+
+            fetchSysConfig() {
+                axios.get('/api/config/all').then(r => {
+                    const data = r.data.data;
+                    this.sysConfig.school_name = data.school_name || '';
+                    this.sysConfig.school_slogan = data.school_slogan || '';
+                    this.sysConfig.school_tags = data.school_tags || '';
+                    this.sysConfig.school_marquee = data.school_marquee || '';
+                    this.sysConfig.school_logo = data.school_logo || '';
+                    this.sysConfig.banner_images = data.banner_images || '[]';
+                    this.sysConfig.school_intro = data.school_intro || '';
+                    if (data.school_details) this.sysDetails = JSON.parse(data.school_details);
+                    if (data.weather_json) this.weatherObj = JSON.parse(data.weather_json);
+                });
+            },
+            saveSysLayout() {
+                const payload = {
+                    ...this.sysConfig,
+                    school_details: JSON.stringify(this.sysDetails),
+                    weather_json: JSON.stringify(this.weatherObj)
+                };
+                axios.post('/api/admin/config/update', payload).then(r => {
+                    this.$message.success("前端布局已实时刷新");
+                });
+            },
+            doLogout() { localStorage.removeItem('adminToken'); window.location.href='/admin-login.html'; }
+        }
+    })
+</script>
+</body>
+</html>

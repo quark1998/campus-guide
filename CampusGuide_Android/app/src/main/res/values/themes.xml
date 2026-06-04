@@ -1,0 +1,20 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <style name="Base.Theme.CampusGuide" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/campus_blue</item>
+        <item name="colorSecondary">@color/campus_cyan</item>
+        <item name="colorAccent">@color/campus_blue</item>
+
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/white</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
+    </style>
+
+    <style name="Theme.CampusGuide" parent="Base.Theme.CampusGuide" />
+
+</resources>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>校园智能导览 - 后台登录</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <style>
+
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #1890ff 0%, #3b5998 100%);
+            font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+        }
+        .login-card {
+            width: 400px;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+        .login-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <el-card class="login-card">
+        <div class="login-title">⚙️ 后台管理系统登录</div>
+
+        <el-form :model="loginForm" @keyup.enter.native="doLogin">
+            <el-form-item>
+                <el-input prefix-icon="el-icon-user-solid" v-model="loginForm.username" placeholder="请输入管理员账号 (admin)"></el-input>
+            </el-form-item>
+            <el-form-item>
+                <el-input prefix-icon="el-icon-lock" v-model="loginForm.password" type="password" placeholder="请输入密码 (admin123)"></el-input>
+            </el-form-item>
+            <el-form-item>
+                <el-button type="primary" style="width: 100%; font-size: 16px; border-radius: 8px;" @click="doLogin" :loading="loading">
+                    立 即 登 录
+                </el-button>
+            </el-form-item>
+        </el-form>
+    </el-card>
+</div>
+
+<script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                loginForm: { username: '', password: '' },
+                loading: false
+            }
+        },
+        methods: {
+            doLogin() {
+                if(!this.loginForm.username || !this.loginForm.password) {
+                    this.$message.warning('账号和密码不能为空！');
+                    return;
+                }
+                this.loading = true;
+                axios.post('/api/admin/login', this.loginForm).then(res => {
+                    this.loading = false;
+                    if(res.data.code === 200) {
+                        this.$message.success(res.data.msg);
+                        localStorage.setItem('adminToken', res.data.token);
+                        setTimeout(() => { window.location.href = '/admin.html'; }, 1000);
+                    } else {
+                        this.$message.error(res.data.msg);
+                    }
+                }).catch(() => {
+                    this.loading = false;
+                    this.$message.error('网络连接失败');
+                });
+            }
+        }
+    })
+</script>
+</body>
+</html>
